@@ -5,18 +5,27 @@
 
 #define BUFSIZE 256
 
-#define CNVSIZE 32
+#define SEESIZE 32
+#define MAPSIZE 64
+#define PIPSIZE 7
 
-struct convert
+struct seed_range
 {
-    unsigned src;
-    unsigned dst;
+    unsigned start;
+    unsigned length;
 };
 
-struct plant_range
+struct convert_rule
 {
-    struct convert* plant;
-    unsigned size;
+    unsigned start;
+    unsigned length;
+    int correction;
+};
+
+struct convert_map
+{
+    struct convert_rule* rules;
+    struct convert_rule* end;
 };
 
 unsigned scan_unsigned(char** cur);
@@ -34,76 +43,82 @@ int main(int argc, char* argv[])
     char buffer[BUFSIZE];
     char* cur = NULL;
     // context
-    struct plant_range seeds[CNVSIZE];
-    struct plant_range* seed = NULL;
-    struct plant_range* seed_end = NULL;
+    struct seed_range seeds[SEESIZE];
+    struct seed_range* seed = NULL;
+    struct seed_range* seed_end = NULL;
+    struct convert_map pipeline[PIPSIZE];
+    struct convert_map* map = NULL;
+    struct convert_map* map_end = NULL;
+
+    // INIT PIPELINE
+    for (size_t i=0 ; i < PIPSIZE ; i++) {
+        pipeline[i].end = pipeline[i].rules = malloc(MAPSIZE * sizeof(struct convert_rule));
+    }
 
     // READ SEEDS
+    // file read
     fgets(buffer, BUFSIZE, file);
     cur = buffer;
     // jump
     while (*cur != ' ') cur++;
-    // add to array
+    // read seeds
     seed = seeds;
     while (*cur != '\n') {
         cur++;
-        unsigned start = scan_unsigned(&cur);
+        seed->start = scan_unsigned(&cur);
         cur++;
-        seed->size = scan_unsigned(&cur);
-        seed->plant = malloc(seed->size * sizeof(struct convert));
-        for (unsigned i=0 ; i < seed->size ; i++) {
-            seed->plant[i].src = start + i;
-            seed->plant[i].dst = start + i;
-        }
+        seed->length = scan_unsigned(&cur);
         seed++;
     }
     seed_end = seed;
 
-    // PROCESS
+    // READ CONVERTION MAPS
+    map = pipeline - 1;
     while (!feof(file)) {
         // GET ROW
         fgets(buffer, BUFSIZE, file);
         if (!*buffer) break;
         cur = buffer;
         // READING
-        if (*cur == '\n');
+        if (*cur == '\n') continue;
         // new map case
         if (*cur < '0' || *cur > '9') {
-            seed = seeds;
-            while (seed != seed_end) {
-                for (unsigned i=0 ; i < seed->size ; i++) {
-                    seed->plant[i].src = seed->plant[i].dst;
-                }
-                seed++;
-            }
+            map++;
             continue;
         }
-        // convertion case
+        // convert rule case
         unsigned dst = scan_unsigned(&cur);
         cur++;
-        unsigned src = scan_unsigned(&cur);
-        int correction = (int)dst - (int)src;
+        map->end->start = scan_unsigned(&cur);
         cur++;
-        unsigned length = scan_unsigned(&cur);
-        // PROCESSING
-        seed = seeds;
-        while (seed != seed_end) {
-            for (unsigned i=0 ; i < seed->size ; i++) {
-                if (seed->plant[i].src >= src && seed->plant[i].src < src+length)
-                    seed->plant[i].dst += correction;
-            }
-            seed++;
-        }
+        map->end->length = scan_unsigned(&cur);
+        map->end->correction = dst - map->end->start;
+        map->end++;
         // RESET BUFFER
         *buffer = '\0';
     }
+    map_end = map+1;
 
     // FIND MIN LOC
+    unsigned min = ~0;
     seed = seeds;
-    unsigned min = seed->plant[0].dst;
     while (seed != seed_end) {
-        for (unsigned i=0 ; i < seed->size ; i++) {
-            if (seed->plant[i].dst < min) min = seed->plant[i].dst;
+        printf("[PASSED]\n");
+        for (size_t i=0 ; i < seed->length ; i++) {
+            unsigned value = seed->start + i;
+            map = pipeline;
+            while (map != map_end) {
+                struct convert_rule* rule = map->rules;
+                while (rule != map->end) {
+                    if (value >= rule->start && value < rule->start + rule->length) {
+                        value += rule->correction;
+                        break;
+                    }
+                    rule++;
+                }
+                map++;
+            }
+            if (value < min) min = value;
         }
         seed++;
     }
@@ -112,10 +127,10 @@ int main(int argc, char* argv[])
     printf("Min: %u\n", min);
 
     // FREE ALLOCATED MEMORY
-    seed = seeds;
-    while (seed != seed_end) {
-        free(seed->plant);
-        seed++;
+    map = pipeline;
+    while (map != map_end) {
+        free(map->rules);
+        map++;
     }
 
     // return
