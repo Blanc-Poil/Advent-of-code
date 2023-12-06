@@ -55,18 +55,21 @@ int main(int argc, char* argv[])
     // PROCESS
     race = races;
     while (race != race_end) {
-        unsigned delta = race->time*race->time - 4*race->dist;
+        double t = (double)race->time;
+        double r = (double)race->dist;
+        double delta = t*t - 4*r;
         double sqrt_delta = sqrt(delta);
-        double x1 = (-race->time - sqrt_delta) / (-2);
-        double x2 = (-race->time + sqrt_delta) / (-2);
-        int min = ceil(x1);
-        int max = ceil(x2);
-        min = (min < 0) ? 0 : min;
-        max = (max < 0) ? 0 : max;
+        double x1 = (-t + sqrt_delta) / (-2);
+        double x2 = (-t - sqrt_delta) / (-2);
+        int min = floor(x1) + 1;
+        int max = ceil(x2) - 1;
+        int ways = max - min + 1;
+        prod *= ways;
+        race++;
     }
 
     // RESULT
-    printf("Prod: %u\n", prod);
+    printf("Prod: %lu\n", prod);
 
     // return
     return 0;
