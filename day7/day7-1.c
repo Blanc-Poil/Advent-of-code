@@ -4,6 +4,17 @@
 
 #define BUFSIZE 256
 
+#define ARRSIZE 1024
+#define HNDSIZE 5
+
+enum HandType {HIGH, PAIR, PAIR2, THREE, FULL, FOUR, FIVE};
+
+struct hand
+{
+    char card[HNDSIZE];
+    enum HandType type;
+};
+
 unsigned scan_unsigned(char** cur);
 
 int main(int argc, char* argv[])
