@@ -14,6 +14,7 @@ enum HandType {HIGH, PAIR, PAIR2, THREE, FULL, FOUR, FIVE};
 struct hand
 {
     int* card;
+    int* card_ordered;
     enum HandType type;
     unsigned bid;
 };
@@ -25,6 +26,7 @@ unsigned scan_unsigned(char** cur);
 void bubble_sort(int* data, size_t size);
 
 void hand_init(struct hand* self, int* cards, unsigned bid);
+void hand_destroy(struct hand* self);
 int get_strength(const char ch);
 bool hand_as_five(const struct hand* self);
 bool hand_as_four(const struct hand* self);
@@ -85,7 +87,6 @@ int main(int argc, char* argv[])
     h = hands;
     size_t rank = 1;
     while (h != h_end) {
-        printf("[Rank: %zu | Bid: %u]\n", rank, h->bid);
         sum += h->bid * rank;
         rank++;
         h++;
@@ -97,7 +98,7 @@ int main(int argc, char* argv[])
     // FREE ALLOCATED MEMORY
     h = h_end;
     while (h != h_end) {
-        free(h->card);
+        hand_destroy(h);
         h++;
     }
 
@@ -135,9 +136,11 @@ void bubble_sort(int* data, size_t size)
 
 void hand_init(struct hand* self, int* cards, unsigned bid)
 {
-    bubble_sort(cards, HNDSIZE);
     self->card = malloc(HNDSIZE * sizeof(int));
+    self->card_ordered = malloc(HNDSIZE * sizeof(int));
     memcpy(self->card, cards, HNDSIZE * sizeof(int));
+    bubble_sort(cards, HNDSIZE);
+    memcpy(self->card_ordered, cards, HNDSIZE * sizeof(int));
     // find hand type
     if (hand_as_five(self)) self->type = FIVE;
     else if (hand_as_four(self)) self->type = FOUR;
@@ -148,6 +151,12 @@ void hand_init(struct hand* self, int* cards, unsigned bid)
     else self->type = HIGH;
     // set bid
     self->bid = bid;
+}
+
+void hand_destroy(struct hand* self)
+{
+    free(self->card); self->card = NULL;
+    free(self->card_ordered); self->card_ordered = NULL;
 }
 
 int get_strength(const char ch)
@@ -165,19 +174,19 @@ int get_strength(const char ch)
 bool hand_as_five(const struct hand* self)
 {
     bool res = true;
-    int val = *self->card;
+    int val = *self->card_ordered;
     for (size_t i=1 ; i < HNDSIZE ; i++) {
-        res &= (self->card[i] == val);
+        res &= (self->card_ordered[i] == val);
     }
     return res;
 }
 
 bool hand_as_four(const struct hand* self)
 {
-    unsigned count = 1;
+    unsigned count = 1  ;
     size_t i = 1;
     while (i < HNDSIZE) {
-        count = (self->card[i-1] == self->card[i]) ? count+1 : 1;
+        count = (self->card_ordered[i-1] == self->card_ordered[i]) ? count+1 : 1;
         if (count == 4) return true;
         i++;
     }
@@ -186,10 +195,10 @@ bool hand_as_four(const struct hand* self)
 
 bool hand_as_full(const struct hand* self)
 {
-    int v1 = *self->card;
-    int v2 = self->card[HNDSIZE-1];
+    int v1 = *self->card_ordered;
+    int v2 = self->card_ordered[HNDSIZE-1];
     for (size_t i = 1 ; i < HNDSIZE-1 ; i++) {
-        if (self->card[i] != v1 && self->card[i] != v2) return false;
+        if (self->card_ordered[i] != v1 && self->card_ordered[i] != v2) return false;
     }
     return true;
 }
@@ -199,7 +208,7 @@ bool hand_as_three(const struct hand* self)
     unsigned count = 1;
     size_t i = 1;
     while (i < HNDSIZE) {
-        count = (self->card[i-1] == self->card[i]) ? count+1 : 1;
+        count = (self->card_ordered[i-1] == self->card_ordered[i]) ? count+1 : 1;
         if (count == 3) return true;
         i++;
     }
@@ -210,7 +219,7 @@ bool hand_as_pair2(const struct hand* self)
 {
     bool first_pair = false;
     for (size_t i=1 ; i < HNDSIZE ; i++) {
-        if (self->card[i-1] == self->card[i]) {
+        if (self->card_ordered[i-1] == self->card_ordered[i]) {
             if (first_pair) return true;
             first_pair = true;
         }
@@ -221,7 +230,7 @@ bool hand_as_pair2(const struct hand* self)
 bool hand_as_pair(const struct hand* self)
 {
     for (size_t i=1 ; i < HNDSIZE ; i++) {
-        if (self->card[i-1] == self->card[i])
+        if (self->card_ordered[i-1] == self->card_ordered[i])
             return true;
     }
     return false;
@@ -232,7 +241,7 @@ int hand_comp(const struct hand* h1, const struct hand* h2)
     int diff = h1->type - h2->type;
     if (diff) return diff;
     // same type case
-    for (size_t i=HNDSIZE-1 ; i >= 0 ; i--) {
+    for (size_t i=0 ; i < HNDSIZE ; i++) {
         diff = h1->card[i] - h2->card[i];
         if (diff) return diff;
     }
@@ -255,7 +264,7 @@ ptrdiff_t hand_partition(struct hand* hands, ptrdiff_t i, ptrdiff_t j, comp_func
     }
     buffer = hands[pivot_index];
     hands[pivot_index] = hands[j];
-    hands[pivot_index] = buffer;
+    hands[j] = buffer;
     return pivot_index;
 }
 
